@@ -160,7 +160,7 @@ sequenceDiagram
 ### 6.2 文档入库流程
 ```mermaid
 flowchart LR
-    A[上传] --> B[存对象存储]
+    A[上传] --> B[本地存储]
     B --> C[写 documents.status=pending]
     C --> D[异步任务]
     D --> E[解析]

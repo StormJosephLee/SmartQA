@@ -13,10 +13,10 @@
 | `kb_admin` | 上传/删除指定知识库 |
 | `admin` | 全部 |
 
-实现位置：`app/core/security.py` + `kb.visibility` 字段
+实现位置：`core/security.py` + `rag/permissions.py` + `kb.visibility` 字段
 
 ## 3. 提示注入防御
-- 输入侧：`app/guardrails/input_filter.py` 关键词 + 规则
+- 输入侧：`guardrails/input_filter.py` 关键词 + 规则
 - 系统提示：明确"仅基于上下文回答"
 - 输出侧：正则/分类器复核关键事实
 
@@ -28,7 +28,7 @@
 
 ## 5. 审计
 - 所有 `messages`、`feedback` 持久化
-- `observability/tracing.py` 记录全链路 trace
+- `observability/tracing.py` 记录全链路 trace（`X-Trace-Id` 由 `core/middleware.py` 注入）
 - 关键操作（登录、上传、删除）落 `audit_log` 表
 
 ## 6. 合规清单

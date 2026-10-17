@@ -30,11 +30,15 @@ make run-ui
 - 聊天界面：http://localhost:8501
 
 ## 4. 5 分钟读懂架构
+- **core/** 负责配置、日志、错误码、JWT 等横切能力
+- **llm/** 负责把各家模型统一成 OpenAI 兼容调用
 - **api/** 只做协议适配 → 业务全在 **services/**
 - **rag/** 负责"找到相关知识"
 - **agents/** 负责"决定怎么用知识"
 - **memory/** 负责"记住对话"
+- **guardrails/** 负责"输入输出安全"
 - **observability/** 负责"看得到全过程"
+- **ui/** 是 Streamlit 界面；**db/** **schemas/** 分别是 ORM 与 DTO
 
 详细见 [architecture.md](./architecture.md)。
 
@@ -47,7 +51,7 @@ make run-ui
 | 目的 | 命令 |
 |---|---|
 | 起服务 | `make run-api` / `make run-ui` |
-| 入库文档 | `make ingest` |
+| 入库文档 | `make ingest`（批量）或 `POST /api/v1/knowledge/upload`（单文件） |
 | 跑测试 | `make test` |
 | 格式化 | `make format` |
 | 初始化 DB | `make init-db` |

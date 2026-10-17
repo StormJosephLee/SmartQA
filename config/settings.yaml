@@ -1,0 +1,32 @@
+# 非敏感的可调参数（敏感项一律走 .env）
+retrieval:
+  vector_top_k: 20
+  bm25_top_k: 20
+  rrf_k: 60
+  rerank_top_n: 5
+  min_score: 0.0
+  max_bm25_corpus: 5000
+
+chunking:
+  default: { strategy: recursive, size: 512, overlap: 64 }
+  report: { strategy: semantic, size: 768, overlap: 0 }
+  table: { strategy: table }
+  code: { strategy: code, size: 1024, overlap: 64 }
+
+agent:
+  max_reflect: 3
+  max_rounds: 8
+  tool_timeout: 10
+
+memory:
+  max_turns: 10
+  max_chars: 4000
+
+security:
+  max_input_chars: 4000
+  forbidden_patterns:
+    - "忽略以上指令"
+    - "ignore previous instructions"
+    - "忽略之前的"
+    - "system prompt"
+    - "reveal your prompt"

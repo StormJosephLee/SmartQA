@@ -11,9 +11,10 @@
 
 ## 当前进度
 - [x] P0 骨架
-- [ ] P1 RAG
-- [ ] P2 Agent
-- [ ] ...
+- [x] P1 RAG
+- [x] P2 Agent
+- [ ] P3 工程化
+- [ ] P4 集成
 
 ## 决策记录（ADR）
 - **ADR-001**：向量库选 pgvector 而非 Milvus
@@ -22,3 +23,7 @@
   - 理由：可观测、状态清晰；后续可能自研以减依赖
 - **ADR-003**：前端用 Streamlit 而非 React
   - 理由：MVP 验证期，先快后好
+- **ADR-004**：代码布局采用**顶层多包**（`api/ core/ llm/ services/ rag/ agents/ memory/ guardrails/ observability/ db/ schemas/ ui/`）
+  - 理由：与 `onboarding.md`、`architecture.md` 的模块心智一致
+  - 影响：`security.md` 中历史遗留的 `app/core`、`app/guardrails`、`app/observability` 路径已统一为顶层包
+  - 新增包说明：`core/`（横切能力）、`llm/`（模型适配层）、`schemas/`（DTO）、`ui/`（前端）

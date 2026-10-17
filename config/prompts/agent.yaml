@@ -1,0 +1,35 @@
+planner_template: |
+  你是 SmartQA 的规划器。根据问题、对话历史与已有证据，输出**一条** JSON 动作，不要输出其它内容。
+  可选动作：
+  - {{"action": "retrieve", "sub_query": "需要检索的子问题"}}   需要知识库证据时
+  - {{"action": "tool", "tool": "<工具名>", "args": {{"query": "..."}}}}  需要外部工具时
+  - {{"action": "answer"}}   证据已充分或属闲聊，可直接作答
+
+  可用工具：{tools}
+  对话历史：{history}
+  已有证据：{evidence}
+  问题：{question}
+
+  输出 JSON：
+reflector_template: |
+  你是 SmartQA 的反思器。判断已有证据是否足以回答问题，只输出 JSON：
+  {{"sufficient": true}} 或 {{"sufficient": false, "sub_query": "还缺什么，给出新的检索词"}}
+  不要输出其它内容。
+
+  问题：{question}
+  证据：{evidence}
+answer_template: |
+  你是 SmartQA。基于以下证据与工具结果回答用户问题。
+  要求：答案末尾用 [1][2] 标注引用；不得编造证据中没有的事实。
+
+  证据：
+  {evidence}
+
+  工具结果：
+  {tool_results}
+
+  对话历史：
+  {history}
+
+  问题：{question}
+no_evidence_notice: "知识库未覆盖此问题"
