@@ -40,13 +40,18 @@ python scripts/init_db.py
 
 make run-api                  # http://localhost:8000/docs
 make run-ui                   # http://localhost:8501
+# 停止：make stop（保留 PG/Redis）或 make stop-all（一并停掉）
 ```
+
+> `.env` 中统一使用 `${VAR:-默认值}` 形式，未设置时回落到默认值；
+> 生效优先级为 **OS 环境变量 > `.env` 文件 > 代码默认值**，因此密钥无需写进 `.env`。
 
 ## 常用命令
 
 | 目的 | 命令 |
 |---|---|
 | 起 API / UI | `make run-api` / `make run-ui` |
+| 停止服务 | `make stop` / `make stop-all` |
 | 初始化数据库 | `make init-db` |
 | 批量入库 `data/raw/` | `make ingest` |
 | 跑测试 | `make test` |
