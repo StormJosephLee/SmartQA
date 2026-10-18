@@ -6,6 +6,7 @@
 from __future__ import annotations
 
 import asyncio
+import time
 from collections.abc import AsyncIterator, Sequence
 from typing import Any
 
@@ -42,13 +43,33 @@ class LLMClient:
         last_exc: Exception | None = None
         for candidate in self._candidate_models(model):
             for attempt in range(settings.llm_max_retries + 1):
+                t0 = time.perf_counter()
                 try:
+                    logger.info(
+                        "llm.complete -> model=%s base_url=%s attempt=%d messages=%d",
+                        candidate,
+                        settings.llm_base_url,
+                        attempt,
+                        len(messages),
+                    )
                     resp = await self._client.chat.completions.create(
                         model=candidate,
                         messages=list(messages),
                         temperature=temperature,
                     )
-                    return resp.choices[0].message.content or ""
+                    content = resp.choices[0].message.content or ""
+                    usage = getattr(resp, "usage", None)
+                    logger.info(
+                        "llm.complete OK model=%s attempt=%d chars=%d tokens=%s/%s/%s cost=%.0fms",
+                        candidate,
+                        attempt,
+                        len(content),
+                        getattr(usage, "prompt_tokens", None),
+                        getattr(usage, "completion_tokens", None),
+                        getattr(usage, "total_tokens", None),
+                        (time.perf_counter() - t0) * 1000,
+                    )
+                    return content
                 except Exception as exc:  # noqa: BLE001 上游异常统一兜底
                     last_exc = exc
                     logger.warning("llm call failed model=%s attempt=%d: %s", candidate, attempt, exc)
@@ -65,7 +86,17 @@ class LLMClient:
         last_exc: Exception | None = None
         for candidate in self._candidate_models(model):
             started = False
+            t0 = time.perf_counter()
+            ttft: float | None = None
+            chunks = 0
+            chars = 0
             try:
+                logger.info(
+                    "llm.stream -> model=%s base_url=%s messages=%d",
+                    candidate,
+                    settings.llm_base_url,
+                    len(messages),
+                )
                 stream = await self._client.chat.completions.create(
                     model=candidate,
                     messages=list(messages),
@@ -75,8 +106,20 @@ class LLMClient:
                 async for chunk in stream:
                     delta = chunk.choices[0].delta.content if chunk.choices else None
                     if delta:
+                        if ttft is None:
+                            ttft = (time.perf_counter() - t0) * 1000
                         started = True
+                        chunks += 1
+                        chars += len(delta)
                         yield delta
+                logger.info(
+                    "llm.stream OK model=%s chunks=%d chars=%d ttft=%sms total=%.0fms",
+                    candidate,
+                    chunks,
+                    chars,
+                    f"{ttft:.0f}" if ttft else "-",
+                    (time.perf_counter() - t0) * 1000,
+                )
                 return
             except Exception as exc:  # noqa: BLE001
                 last_exc = exc
