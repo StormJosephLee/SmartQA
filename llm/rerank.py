@@ -6,6 +6,7 @@
 
 from __future__ import annotations
 
+import time
 from collections.abc import Sequence
 
 import httpx
@@ -23,6 +24,9 @@ class Reranker:
         if not documents:
             return []
         if settings.rerank_provider != "http" or not settings.rerank_base_url:
+            logger.info(
+                "rerank disabled (provider=%s), keep fusion order", settings.rerank_provider
+            )
             return [(i, 0.0) for i in range(min(top_n, len(documents)))]
 
         payload = {
@@ -32,6 +36,7 @@ class Reranker:
             "top_n": top_n,
         }
         headers = {"Authorization": f"Bearer {settings.rerank_api_key}"}
+        t0 = time.perf_counter()
         try:
             async with httpx.AsyncClient(timeout=settings.llm_timeout) as client:
                 resp = await client.post(
@@ -51,9 +56,19 @@ class Reranker:
             if idx is not None:
                 pairs.append((int(idx), float(score)))
         if not pairs:
+            logger.warning("rerank returned no valid pairs, keep fusion order")
             return [(i, 0.0) for i in range(min(top_n, len(documents)))]
         pairs.sort(key=lambda x: x[1], reverse=True)
-        return pairs[:top_n]
+        result = pairs[:top_n]
+        logger.info(
+            "rerank OK model=%s docs=%d top_n=%d hits=%d cost=%.0fms",
+            settings.rerank_model,
+            len(documents),
+            top_n,
+            len(result),
+            (time.perf_counter() - t0) * 1000,
+        )
+        return result
 
 
 _reranker: Reranker | None = None
