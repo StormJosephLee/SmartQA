@@ -10,17 +10,22 @@ from fastapi.responses import JSONResponse
 from starlette.middleware.base import BaseHTTPMiddleware
 
 from core.errors import INTERNAL, BizError
-from core.logging import get_logger, mask_pii
+from core.logging import bind_trace, get_logger, mask_pii, reset_trace
 
 logger = get_logger(__name__)
 
 
 class TraceIdMiddleware(BaseHTTPMiddleware):
-    """请求进入即生成/透传 X-Trace-Id，并统一捕获异常出口。"""
+    """请求进入即生成/透传 X-Trace-Id，并统一捕获异常出口。
+
+    trace_id 同时写入 contextvars（core.logging._TRACE_ID），使下游所有
+    logger 调用自动带上 trace=<id>（observability.md §7）。
+    """
 
     async def dispatch(self, request: Request, call_next):  # type: ignore[no-untyped-def]
         trace_id = request.headers.get("X-Trace-Id") or uuid.uuid4().hex
         request.state.trace_id = trace_id
+        token = bind_trace(trace_id)
         start = time.perf_counter()
         try:
             response = await call_next(request)
@@ -41,6 +46,7 @@ class TraceIdMiddleware(BaseHTTPMiddleware):
         logger.info(
             "%s %s -> %s (%dms)", request.method, request.url.path, response.status_code, cost_ms
         )
+        reset_trace(token)
         return response
 
 

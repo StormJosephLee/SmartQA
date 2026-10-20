@@ -12,7 +12,7 @@ from collections.abc import Sequence
 import httpx
 
 from core.config import get_settings
-from core.logging import get_logger
+from core.logging import get_logger, truncate
 
 logger = get_logger(__name__)
 settings = get_settings()
@@ -20,6 +20,9 @@ settings = get_settings()
 # 合法 provider 取值，启动时会校验并告警非法配置
 _VALID_PROVIDERS = ("none", "http")
 _PROVIDER_VALIDATED = False
+# 日志中 query / 单条文档的最大保留长度（observability.md §3.3）
+_QUERY_LOG_LIMIT = 30
+_DOC_LOG_LIMIT = 80
 
 
 def _validate_provider_once() -> None:
@@ -56,6 +59,20 @@ class Reranker:
         }
         headers = {"Authorization": f"Bearer {settings.rerank_api_key}"}
         t0 = time.perf_counter()
+        # 入参日志：query 只打印前 30 字符（脱敏），documents 只打印条数
+        logger.debug(
+            "rerank -> model=%s base_url=%s docs=%d top_n=%d query_len=%d query=%r",
+            settings.rerank_model,
+            settings.rerank_base_url,
+            len(documents),
+            top_n,
+            len(query or ""),
+            truncate(query, _QUERY_LOG_LIMIT),
+        )
+        logger.debug(
+            "rerank docs preview: %s",
+            [truncate(d, _DOC_LOG_LIMIT) for d in documents[:3]],
+        )
         try:
             async with httpx.AsyncClient(timeout=settings.llm_timeout) as client:
                 resp = await client.post(

@@ -12,7 +12,7 @@ from sqlalchemy.orm import Session
 
 from core.config import ROOT_DIR
 from core.errors import not_found
-from core.logging import get_logger
+from core.logging import get_logger, trace_context
 from db.models import Chunk, Document
 from db.session import SessionLocal
 from rag.pipeline import ingest_document
@@ -83,13 +83,13 @@ def delete_document(session: Session, doc_id: str) -> str:
 
 
 async def run_ingestion(doc_id: str, file_path: Path, profile: str = "default") -> None:
-    """后台任务：独立 session，避免跨请求复用。"""
-    with SessionLocal() as session:
+    """后台任务：独立 session 与独立 trace_id（observability.md §7）。"""
+    with SessionLocal() as session, trace_context(f"bg-ingest-{doc_id}"):
         doc = session.get(Document, doc_id)
         if doc is None:
             logger.error("document %s not found for ingestion", doc_id)
             return
         try:
             await ingest_document(session, doc, file_path, profile)
-        except Exception:  # noqa: BLE001 状态已落库，避免后台任务抛出未捕获异常
-            logger.error("ingestion failed for %s", doc_id)
+        except Exception as exc:  # noqa: BLE001 状态已落库，避免后台任务抛出未捕获异常
+            logger.error("ingestion failed for %s: %s", doc_id, exc)
