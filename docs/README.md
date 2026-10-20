@@ -13,6 +13,7 @@
 - [rag_design.md](./rag_design.md)          RAG 模块设计
 - [agent_design.md](./agent_design.md)      Agent 模块设计
 - [security.md](./security.md)              安全 / 权限 / 合规
+- [observability.md](./observability.md)    横切可观测规范（日志结构 / LLM I/O / Trace / 脱敏）
 - [deployment.md](./deployment.md)          部署与运维
 - [roadmap.md](./roadmap.md)                演进路线与里程碑
 

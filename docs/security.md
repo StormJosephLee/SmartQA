@@ -24,7 +24,7 @@
 - 文档上传只允许内网用户
 - 对象存储目录不进 Git
 - PII 字段在输出侧脱敏（`output_filter.check`）
-- 日志脱敏（手机/身份证/邮箱）
+- 日志脱敏（手机/身份证/邮箱，详见 [observability.md §6](./observability.md#6-pii-脱敏)）
 
 ## 5. 审计
 - 所有 `messages`、`feedback` 持久化

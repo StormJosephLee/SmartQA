@@ -61,3 +61,7 @@ flowchart LR
 | 上下文超长 | 二次压缩/摘要 |
 | 多语言混排 | Embedding 选 multilingual |
 | 表格理解差 | 表格转 Markdown + caption |
+
+## 8. 可观测
+
+Embedding / Rerank 调用的入参/返回日志规范见 [observability.md](./observability.md) §3.2 / §3.3。

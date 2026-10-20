@@ -4,7 +4,7 @@
 1. **配置与代码分离**：所有可变项走 `config/` 与 `.env`，零硬编码
 2. **接口与业务解耦**：`api/` 只做参数解析，业务在 `services/`
 3. **RAG 与 Agent 解耦**：`rag/` 是无状态检索能力，`agents/` 是有状态编排
-4. **全链路可观测**：每个请求带 `X-Trace-Id`，落 Langfuse
+4. **全链路可观测**：每个请求带 `X-Trace-Id`，落 Langfuse；模型调用 I/O 日志规范见 [observability.md](./observability.md)
 5. **失败兜底**：每层都有降级路径，缺一不可
 
 ## 2. 整体架构图

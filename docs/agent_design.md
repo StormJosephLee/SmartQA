@@ -42,3 +42,7 @@ stateDiagram-v2
 - 工具权限白名单（白名单内的工具才允许）
 - SQL 工具只读，且仅允许查询视图
 - Web 搜索结果需 Rerank 后再喂给 LLM
+
+## 7. 可观测
+
+LLM 调用（Planner / Reflector / Answer）的入参/返回日志规范见 [observability.md](./observability.md) §3.1。
