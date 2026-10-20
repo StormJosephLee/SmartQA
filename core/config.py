@@ -10,6 +10,7 @@ from pathlib import Path
 from typing import Any
 
 import yaml
+from pydantic import field_validator
 from pydantic_settings import BaseSettings, SettingsConfigDict
 
 ROOT_DIR = Path(__file__).resolve().parents[1]
@@ -36,13 +37,23 @@ class Settings(BaseSettings):
     llm_model: str = "deepseek-chat"
     llm_fallback_model: str = ""
     llm_timeout: int = 30
-    llm_max_retries: int = 2
+    llm_max_retries: int = 3
+    # 重试初始退避（秒，指数增长；识别到"服务过载"时会自动加长）
+    llm_retry_backoff: float = 1.0
 
     # Embedding
     embedding_base_url: str = ""
     embedding_api_key: str = ""
     embedding_model: str = "BAAI/bge-m3"
+    # pgvector 列维度（期望维度）
     embedding_dim: int = 1024
+    # 请求模型时携带的 dimensions 参数（降维）：
+    #   留空(None) = 跟随 embedding_dim
+    #   >0        = 显式请求该维度
+    #   0         = 不传 dimensions 参数（兼容不支持该参数的服务端）
+    embedding_dimensions: int | None = None
+    # 返回维度与期望不符时是否严格抛错（True=抛，False=仅 warn；建议生产 True）
+    embedding_strict_dim: bool = False
 
     # Rerank（none | http）
     rerank_provider: str = "none"
@@ -76,6 +87,17 @@ class Settings(BaseSettings):
     # 工具安全
     agent_allowed_tools: str = "kb_search,web_search,calculator,db_query"
     db_readonly_views: str = ""
+
+    @field_validator("embedding_dimensions", mode="before")
+    @classmethod
+    def _coerce_dimensions(cls, v):  # noqa: ANN001
+        """空串视为 None（便于 .env 用 ${VAR:-} 留空）。"""
+        if v is None or v == "":
+            return None
+        try:
+            return int(v)
+        except (TypeError, ValueError):
+            return None
 
     @property
     def database_url(self) -> str:

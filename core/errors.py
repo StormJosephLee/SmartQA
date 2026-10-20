@@ -38,5 +38,10 @@ def not_found(message: str = "资源不存在") -> BizError:
     return BizError(NOT_FOUND, message, status_code=404)
 
 
-def llm_upstream(message: str = "模型服务异常") -> BizError:
-    return BizError(LLM_UPSTREAM, message, status_code=502)
+def llm_upstream(
+    message: str = "模型服务异常",
+    *,
+    status_code: int = 502,
+    detail: Any = None,
+) -> BizError:
+    return BizError(LLM_UPSTREAM, message, status_code=status_code, detail=detail)

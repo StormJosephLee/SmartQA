@@ -17,16 +17,35 @@ from core.logging import get_logger
 logger = get_logger(__name__)
 settings = get_settings()
 
+# 合法 provider 取值，启动时会校验并告警非法配置
+_VALID_PROVIDERS = ("none", "http")
+_PROVIDER_VALIDATED = False
+
+
+def _validate_provider_once() -> None:
+    """启动期一次性校验：非法 provider 值 → warning + 自动回退为 none。"""
+    global _PROVIDER_VALIDATED
+    if _PROVIDER_VALIDATED:
+        return
+    _PROVIDER_VALIDATED = True
+    p = settings.rerank_provider
+    if p not in _VALID_PROVIDERS:
+        logger.warning(
+            "rerank provider=%r 不在合法值 %s 中，自动按 none 处理（不会调用任何重排服务）。"
+            "如需开启，请确认该服务商支持 OpenAI 兼容的 /rerank 端点。",
+            p,
+            list(_VALID_PROVIDERS),
+        )
+
 
 class Reranker:
     async def rerank(self, query: str, documents: Sequence[str], top_n: int) -> list[tuple[int, float]]:
         """返回 [(原始下标, 分数), ...]，已按分数降序并截断到 top_n。"""
+        _validate_provider_once()
         if not documents:
             return []
         if settings.rerank_provider != "http" or not settings.rerank_base_url:
-            logger.info(
-                "rerank disabled (provider=%s), keep fusion order", settings.rerank_provider
-            )
+            # 关闭分支：状态已在模块导入时校验过，此处静默返回
             return [(i, 0.0) for i in range(min(top_n, len(documents)))]
 
         payload = {
@@ -69,6 +88,10 @@ class Reranker:
             (time.perf_counter() - t0) * 1000,
         )
         return result
+
+
+# 模块导入时即校验一次，避免首次请求才暴露配置问题
+_validate_provider_once()
 
 
 _reranker: Reranker | None = None

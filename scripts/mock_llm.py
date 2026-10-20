@@ -28,13 +28,13 @@ app = FastAPI(title="SmartQA Mock LLM")
 EMBED_DIM = 1024
 
 
-def embed(text: str) -> list[float]:
+def embed(text: str, dim: int = EMBED_DIM) -> list[float]:
     """字符哈希 → 稀疏向量 → L2 归一化，保证相同字符越多越相似。"""
-    vec = [0.0] * EMBED_DIM
+    vec = [0.0] * dim
     for ch in (text or "").lower():
         digest = hashlib.md5(ch.encode("utf-8"), usedforsecurity=False).hexdigest()
-        vec[int(digest[:8], 16) % EMBED_DIM] += 1.0
-        vec[int(digest[8:16], 16) % EMBED_DIM] += 0.5
+        vec[int(digest[:8], 16) % dim] += 1.0
+        vec[int(digest[8:16], 16) % dim] += 0.5
     norm = sum(v * v for v in vec) ** 0.5
     return [v / norm for v in vec] if norm else vec
 
@@ -118,12 +118,18 @@ async def embeddings(request: Request):
     body = await request.json()
     raw_input = body.get("input")
     texts = [raw_input] if isinstance(raw_input, str) else list(raw_input or [])
+    # 支持 dimensions（降维），不传则用模型原生维度
+    try:
+        dim = int(body.get("dimensions") or EMBED_DIM)
+    except (TypeError, ValueError):
+        dim = EMBED_DIM
+    dim = dim if dim > 0 else EMBED_DIM
     return JSONResponse(
         {
             "object": "list",
             "model": body.get("model", "mock-embedding"),
             "data": [
-                {"object": "embedding", "index": i, "embedding": embed(t)} for i, t in enumerate(texts)
+                {"object": "embedding", "index": i, "embedding": embed(t, dim)} for i, t in enumerate(texts)
             ],
             "usage": {"prompt_tokens": sum(len(t) for t in texts), "total_tokens": sum(len(t) for t in texts)},
         }

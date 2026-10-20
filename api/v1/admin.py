@@ -47,6 +47,7 @@ async def runtime_config(current: AuthUser = Depends(get_current_user)) -> dict:
         "llm_fallback_model": settings.llm_fallback_model,
         "embedding_model": settings.embedding_model,
         "embedding_dim": settings.embedding_dim,
+        "embedding_dimensions": settings.embedding_dimensions,
         "rerank_provider": settings.rerank_provider,
         "web_search_provider": settings.web_search_provider,
         "allowed_tools": settings.allowed_tools,
