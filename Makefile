@@ -24,6 +24,9 @@ run-api:
 run-ui:
 	streamlit run ui/streamlit_app.py --server.port 8501
 
+run-api-debug:
+	uvicorn main:app --port 8000
+
 # 说明：模式里的 [a] 是常见的自匹配规避写法，避免 pkill -f 把执行本命令的 shell 自己也杀掉。
 # 行首的 - 表示即使没有匹配到进程也不中断。
 stop:
