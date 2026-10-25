@@ -5,6 +5,7 @@
 
 from __future__ import annotations
 
+import asyncio
 import json
 import time
 import uuid
@@ -17,6 +18,7 @@ from sqlalchemy.orm import Session
 from agents.graph import QAAgent
 from agents.nodes.answer import build_direct_messages
 from agents.tools.base import ToolContext
+from core.config import cfg
 from core.logging import get_logger
 from db.models import ChatSession, Citation, Message
 from guardrails import input_filter, output_filter
@@ -211,7 +213,16 @@ class ChatService:
     # ---------- 流式 ----------
     async def stream_events(self, req: ChatRequest) -> AsyncIterator[str]:
         start = time.perf_counter()
-        prepared = await self.prepare(req)
+        interval = max(1.0, float(cfg("agent.heartbeat_interval", 10)))
+        # Agent 模式下 prepare 内含多次串行 LLM 调用，可能几十秒不产出任何数据，
+        # 客户端会按读超时判定失败；这里定期推送 SSE 注释行保活（前端解析时忽略）。
+        task = asyncio.ensure_future(self.prepare(req))
+        while not task.done():
+            _ = await asyncio.wait({task}, timeout=interval)
+            if task.done():
+                break
+            yield ": ping\n\n"
+        prepared = task.result()
 
         if prepared.citations:
             yield sse("citation", [c.model_dump() for c in prepared.citations])

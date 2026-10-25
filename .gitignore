@@ -9,3 +9,5 @@ storage/
 data/raw/
 *.log
 .DS_Store
+launch.json
+settings.json

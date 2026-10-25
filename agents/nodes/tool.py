@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import asyncio
+import time
 from collections.abc import Callable
 from typing import Any
 
@@ -10,7 +11,7 @@ from agents.state import AgentState
 from agents.tools import get_tool
 from agents.tools.base import ToolContext
 from core.config import cfg
-from core.logging import get_logger
+from core.logging import get_logger, truncate
 
 logger = get_logger(__name__)
 
@@ -29,20 +30,43 @@ def make_tool_node(ctx: ToolContext) -> Callable[[AgentState], Any]:
         trace = list(state.get("trace", []))
 
         if tool is None:
+            logger.warning("tool.call rejected name=%s reason=not_in_whitelist", name)
             trace.append(f"tool:{name} -> 被白名单拒绝")
             return {"tool_results": results, "trace": trace}
 
+        call_t0 = time.perf_counter()
+        logger.info(
+            "tool.call -> name=%s timeout=%.1fs args=%s",
+            name,
+            timeout,
+            truncate(str(args)),
+        )
         try:
             result = await asyncio.wait_for(tool.run(args, ctx), timeout=timeout)
         except TimeoutError:
+            logger.warning("tool.call timeout name=%s after=%.1fs", name, timeout)
             result = None
             trace.append(f"tool:{name} -> 超时 {timeout}s，已跳过")
             results.append({"tool": name, "args": args, "output": "", "ok": False, "error": "timeout"})
         except Exception as exc:  # noqa: BLE001 工具异常不阻断主流程
-            logger.warning("tool %s failed: %s", name, exc)
+            logger.warning(
+                "tool.call failed name=%s cost=%.0fms: %s",
+                name,
+                (time.perf_counter() - call_t0) * 1000,
+                exc,
+            )
             trace.append(f"tool:{name} -> 异常，已跳过")
             results.append({"tool": name, "args": args, "output": "", "ok": False, "error": str(exc)[:200]})
         else:
+            call_ms = (time.perf_counter() - call_t0) * 1000
+            logger.info(
+                "tool.call OK name=%s ok=%s chars=%d cost=%.0fms output=%s",
+                name,
+                result.ok,
+                len(result.output or ""),
+                call_ms,
+                truncate(result.output or result.error or ""),
+            )
             trace.append(f"tool:{name} -> ok={result.ok}")
             results.append(
                 {

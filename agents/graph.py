@@ -5,6 +5,9 @@ Router → RAG / Tool / DirectLLM → Reflect → Answer → Guardrail
 
 from __future__ import annotations
 
+import asyncio
+from typing import cast
+
 from langgraph.graph import END, StateGraph
 
 from agents.nodes import (
@@ -85,6 +88,23 @@ class QAAgent:
             "guardrail": "ok",
             "guardrail_retry": 0,
         }
-        state = await self.graph.ainvoke(initial)
-        logger.info("agent finished, trace=%s", state.get("trace"))
-        return state
+        timeout = float(cfg("agent.timeout", 60))
+        recursion_limit = int(cfg("agent.recursion_limit", 30))
+        try:
+            result: AgentState = cast(
+                AgentState,
+                await asyncio.wait_for(
+                    self.graph.ainvoke(initial, {"recursion_limit": recursion_limit}),
+                    timeout=timeout,
+                ),
+            )
+        except TimeoutError:
+            # 上层会退化为「系统提示 + 用户问题」的直答（见 chat_service.prepare 尾部兜底）
+            logger.warning("agent timed out after %.0fs, degrade to direct answer", timeout)
+            result = {
+                **initial,
+                "answer_messages": [],
+                "trace": [*initial["trace"], f"agent timeout after {int(timeout)}s"],
+            }
+        logger.info("agent finished, trace=%s", result.get("trace"))
+        return result

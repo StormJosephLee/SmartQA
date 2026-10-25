@@ -111,8 +111,8 @@ class LLMClient:
                         getattr(usage, "total_tokens", None),
                         (time.perf_counter() - t0) * 1000,
                     )
-                    logger.debug(
-                        "llm.complete content preview model=%s: %s",
+                    logger.info(
+                        "llm.complete content model=%s: %s",
                         candidate,
                         truncate(content, _CONTENT_LOG_LIMIT),
                     )
@@ -145,6 +145,7 @@ class LLMClient:
             ttft: float | None = None
             chunks = 0
             chars = 0
+            pieces: list[str] = []
             try:
                 logger.info(
                     "llm.stream -> model=%s base_url=%s messages=%d chars=%d temperature=%.2f",
@@ -169,6 +170,7 @@ class LLMClient:
                         started = True
                         chunks += 1
                         chars += len(delta)
+                        pieces.append(delta)
                         yield delta
                 logger.info(
                     "llm.stream OK model=%s chunks=%d chars=%d ttft=%sms total=%.0fms",
@@ -177,6 +179,11 @@ class LLMClient:
                     chars,
                     f"{ttft:.0f}" if ttft else "-",
                     (time.perf_counter() - t0) * 1000,
+                )
+                logger.info(
+                    "llm.stream content model=%s: %s",
+                    candidate,
+                    truncate("".join(pieces), _CONTENT_LOG_LIMIT),
                 )
                 return
             except Exception as exc:  # noqa: BLE001

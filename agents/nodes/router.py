@@ -58,6 +58,7 @@ def make_router() -> Callable[[AgentState], Any]:
         try:
             raw = await llm.complete([{"role": "user", "content": plan_prompt}], temperature=0.0)
             plan = _extract_json(raw)
+            
         except Exception as exc:  # noqa: BLE001 规划失败默认走检索
             logger.warning("router failed, fallback to retrieve: %s", exc)
             plan = {}

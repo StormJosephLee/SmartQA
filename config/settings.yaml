@@ -15,8 +15,15 @@ chunking:
 
 agent:
   max_reflect: 3
-  max_rounds: 8
+  # 最大反思/检索轮次：直接决定 Agent 模式下串行 LLM 调用次数的上限，越大越容易超时
+  max_rounds: 3
   tool_timeout: 10
+  # Agent 整体超时（秒）：超时后降级为直答，避免 prepare 阶段无限等待
+  timeout: 60
+  # 状态机最大节点执行数，防止图意外循环时打不出去
+  recursion_limit: 30
+  # prepare 阶段 SSE 心跳间隔（秒），需小于客户端读超时
+  heartbeat_interval: 10
 
 memory:
   max_turns: 10
