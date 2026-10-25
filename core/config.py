@@ -5,6 +5,8 @@
 
 from __future__ import annotations
 
+import os
+import re
 from functools import lru_cache
 from pathlib import Path
 from typing import Any
@@ -15,6 +17,25 @@ from pydantic_settings import BaseSettings, SettingsConfigDict
 
 ROOT_DIR = Path(__file__).resolve().parents[1]
 CONFIG_DIR = ROOT_DIR / "config"
+
+# 未被 shell / dotenv 展开的占位符字面量，例如 "${LLM_TIMEOUT:-30}"
+_UNRESOLVED_PLACEHOLDER = re.compile(r"^\$\{[^}]*\}$")
+
+
+def _is_unresolved(value: Any) -> bool:
+    """判断值是否为未展开的 ${VAR} / ${VAR:-default} 字面量。"""
+    return isinstance(value, str) and bool(_UNRESOLVED_PLACEHOLDER.match(value.strip()))
+
+
+def _purge_unresolved_env_vars() -> None:
+    """
+    从 os.environ 剔除未展开的占位符。
+    """
+    for name in [k for k, v in os.environ.items() if _is_unresolved(v)]:
+        os.environ.pop(name, None)
+
+
+_purge_unresolved_env_vars()
 
 
 class Settings(BaseSettings):
