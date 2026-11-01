@@ -8,7 +8,16 @@ from core.config import get_settings
 from core.logging import get_logger
 from core.security import hash_password
 from db.base import Base
-from db.models import Chunk, Citation, Document, Feedback, KnowledgeBase, Message, User  # noqa: F401
+from db.models import (  # noqa: F401
+    Chunk,
+    Citation,
+    Document,
+    Feedback,
+    KnowledgeBase,
+    LongTermMemory,
+    Message,
+    User,
+)
 from db.session import SessionLocal, engine
 
 logger = get_logger(__name__)

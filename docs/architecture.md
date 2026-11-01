@@ -75,7 +75,8 @@ flowchart TB
 [Client] → Nginx → FastAPI(middleware: TraceId/Auth) → api/chat.py
 → services/chat_service.py
   → guardrails.input_filter.check
-  → memory.short_term.load
+  → memory.short_term.load            # 会话内历史
+  → memory.long_term.recall           # 跨会话记忆，注入 system 消息
   → agents.qa_agent.plan
       → rag.retrieve (vector + BM25 + rerank)
       → tools.invoke (web_search / calculator / db_query)
@@ -83,6 +84,7 @@ flowchart TB
   → guardrails.output_filter.check
   → memory.short_term.save
   → db.persist_message
+  → memory.long_term.consolidate      # 异步后台，不阻塞本次响应
 → SSE 流式回传
 ```
 
@@ -95,6 +97,7 @@ erDiagram
     DOCUMENT ||--o{ CHUNK : split_into
     MESSAGE ||--o{ CITATION : has
     USER ||--o{ FEEDBACK : gives
+    USER ||--o{ LONG_TERM_MEMORY : owns
 
     USER { string id PK string name string role string dept }
     SESSION { string id PK string user_id string title }
@@ -104,6 +107,7 @@ erDiagram
     CHUNK { string id PK string doc_id text content vector embedding json meta }
     CITATION { string source float score int page string snippet }
     FEEDBACK { string id PK string message_id int score string comment }
+    LONG_TERM_MEMORY { string id PK string user_id string kind text content vector embedding int hit_count bool pinned }
 ```
 
 ## 6. 部署拓扑

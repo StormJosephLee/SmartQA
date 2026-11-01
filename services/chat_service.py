@@ -23,6 +23,7 @@ from core.logging import get_logger
 from db.models import ChatSession, Citation, Message
 from guardrails import input_filter, output_filter
 from llm.chat import get_llm
+from memory import long_term
 from memory.short_term import get_memory
 from observability.tracing import trace_span
 from rag.permissions import visible_kb_ids
@@ -31,6 +32,9 @@ from schemas.chat import ChatRequest, ChatResponse, CitationItem
 from services.auth_service import AuthUser
 
 logger = get_logger(__name__)
+
+# 长期记忆沉淀放在后台任务里执行；asyncio 对未完成任务只持弱引用，必须自己留住强引用
+_BACKGROUND_TASKS: set[asyncio.Task] = set()
 
 
 def estimate_tokens(text: str) -> int:
@@ -135,6 +139,7 @@ class ChatService:
                 {"role": "system", "content": "你是 SmartQA，企业内部智能问答助手。"},
                 {"role": "user", "content": req.message},
             ]
+        prepared.messages = await self._with_memories(prepared.messages, req.message)
         return prepared
 
     @staticmethod
@@ -189,6 +194,49 @@ class ChatService:
         except Exception as exc:  # noqa: BLE001 记忆失败不阻断问答
             logger.warning("memory save failed: %s", exc)
 
+    @property
+    def _user_id(self) -> str:
+        # 与 _ensure_session 保持一致的取值口径
+        return self.user.id or self.user.name
+
+    async def _with_memories(
+        self, messages: list[dict[str, str]], query: str
+    ) -> list[dict[str, str]]:
+        """召回长期记忆并以 system 消息注入到最前面（memory_design.md#4）。"""
+        if not long_term.enabled():
+            return messages
+        try:
+            memories = await long_term.recall(self.session, self._user_id, query)
+        except Exception as exc:  # noqa: BLE001 记忆不可用应静默降级
+            logger.warning("long-term memory recall failed: %s", exc)
+            return messages
+        context = long_term.render_context(memories)
+        if not context:
+            return messages
+        return [{"role": "system", "content": context}, *messages]
+
+    async def _consolidate_memory(self, session_id: str, question: str, answer: str) -> None:
+        """沉淀本轮对话到长期记忆：LLM 抽取 → 去重写入。失败不影响已发出的回答。"""
+        if not long_term.enabled():
+            return
+        try:
+            items = await long_term.extract_memories(question, answer)
+            if not items:
+                return
+            await long_term.consolidate(
+                self.session, self._user_id, items, source_id=session_id
+            )
+        except Exception as exc:  # noqa: BLE001 沉淀失败只记录，不影响主链路
+            logger.warning("long-term memory consolidate failed: %s", exc)
+
+    def _schedule_consolidate(self, session_id: str, question: str, answer: str) -> None:
+        """把沉淀排到后台，避免阻塞本轮回答与 SSE done 事件的到达。"""
+        if not long_term.enabled():
+            return
+        task = asyncio.create_task(self._consolidate_memory(session_id, question, answer))
+        _BACKGROUND_TASKS.add(task)
+        task.add_done_callback(_BACKGROUND_TASKS.discard)
+
     # ---------- 非流式 ----------
     async def chat(self, req: ChatRequest) -> ChatResponse:
         start = time.perf_counter()
@@ -200,6 +248,7 @@ class ChatService:
             prepared.session_id, req.message, answer, prepared.citations, latency_ms
         )
         self._remember(prepared.session_id, req.message, answer)
+        self._schedule_consolidate(prepared.session_id, req.message, answer)
         return ChatResponse(
             message_id=message_id,
             session_id=prepared.session_id,
@@ -250,6 +299,8 @@ class ChatService:
             prepared.session_id, req.message, answer, prepared.citations, latency_ms
         )
         self._remember(prepared.session_id, req.message, answer)
+        # 沉淀排到后台，使 SSE done 事件不受 LLM 抽取耗时影响
+        self._schedule_consolidate(prepared.session_id, req.message, answer)
         yield sse(
             "done",
             {

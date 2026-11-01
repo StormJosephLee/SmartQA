@@ -115,3 +115,44 @@ data: {"message_id": "uuid", "tokens": 312}
 
 ### `GET /api/v1/admin/config`
 - 返回当前 LLM/Embedding 模型等运行期配置
+
+---
+
+## 6. 长期记忆
+
+> 设计见 [memory_design.md](./memory_design.md)。全部接口需 JWT，且**只能操作本人的记忆**。
+
+### `GET /api/v1/memory`
+- 列出当前用户的长期记忆
+- 响应：
+```json
+{ "enabled": true, "total": 3,
+  "items": [{ "id": "a1b2", "kind": "profile", "content": "用户是后端工程师",
+              "pinned": false, "hit_count": 7, "source_id": "sess_1",
+              "created_at": "2026-10-25T12:00:00Z", "updated_at": "2026-10-25T12:30:00Z" }] }
+```
+
+### `POST /api/v1/memory`
+- 手动添加一条记忆
+- 请求：`{ "content": "回答统一用中文", "kind": "instruction", "pinned": false }`
+- `kind` 必须在 `memory.allowed_kinds` 白名单内，否则 `400`
+- `content` 长度 1~500
+- 响应：`MemoryItem`
+
+### `DELETE /api/v1/memory/{memory_id}`
+- 删除单条记忆（**被遗忘权**）
+- 响应：`{ "deleted": true, "id": "a1b2" }`
+
+### `DELETE /api/v1/memory`
+- 清空当前用户的全部长期记忆
+- 响应：`{ "deleted": false, "cleared": 3 }`
+
+**错误码**：
+
+| 情况 | 状态码 | code |
+|---|---|---|
+| 未携带有效 Token | 401 | `UNAUTHORIZED` |
+| 删除不存在/不属于自己的记忆 | 404 | `NOT_FOUND` |
+| `kind` 非法或 `content` 为空 | 400 | HTTPException `detail` |
+
+> 注意：为避免探测他人资源是否存在，删除非本人的记忆统一返回 404 而非 403。

@@ -6,7 +6,7 @@ import uuid
 from datetime import UTC, datetime
 
 from pgvector.sqlalchemy import Vector
-from sqlalchemy import JSON, DateTime, Float, ForeignKey, Integer, String, Text
+from sqlalchemy import JSON, Boolean, DateTime, Float, ForeignKey, Integer, String, Text
 from sqlalchemy.orm import Mapped, mapped_column
 
 from core.config import get_settings
@@ -114,3 +114,25 @@ class Feedback(Base):
     score: Mapped[int] = mapped_column(Integer, default=0)  # 1=👍 0=👎
     comment: Mapped[str] = mapped_column(Text, default="")
     created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=_now)
+
+
+class LongTermMemory(Base):
+    """长期记忆：跨会话留存的用户画像/偏好/事实/指令（memory_design.md#2）。"""
+
+    __tablename__ = "long_term_memories"
+
+    id: Mapped[str] = mapped_column(String(64), primary_key=True, default=_id)
+    user_id: Mapped[str] = mapped_column(String(64), index=True)
+    # profile=用户画像 / preference=偏好 / fact=事实 / instruction=长期指令
+    kind: Mapped[str] = mapped_column(String(32), default="fact", index=True)
+    content: Mapped[str] = mapped_column(Text)
+    # 语义去重与检索用；向量化失败或未启用时为 NULL，此时退化为内容精确去重
+    embedding = mapped_column(Vector(EMBEDDING_DIM), nullable=True)
+    # 来源（会话/消息 id），便于追溯与审计
+    source_id: Mapped[str] = mapped_column(String(64), default="")
+    hit_count: Mapped[int] = mapped_column(Integer, default=0)
+    pinned: Mapped[bool] = mapped_column(Boolean, default=False)
+    created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=_now)
+    updated_at: Mapped[datetime] = mapped_column(
+        DateTime(timezone=True), default=_now, onupdate=_now
+    )

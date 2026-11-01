@@ -99,6 +99,88 @@ def ask_stream(question: str, use_rag: bool, use_agent: bool, session_id: str | 
                     )
 
 
+_MEMORY_KINDS = ("fact", "profile", "preference", "instruction")
+_KIND_LABEL = {
+    "fact": "事实",
+    "profile": "画像",
+    "preference": "偏好",
+    "instruction": "指令",
+}
+
+
+def _api(method: str, path: str, **kw: Any):
+    """统一 API 调用；失败时在侧边栏提示并返回 None。"""
+    try:
+        resp = httpx.request(method, f"{API_BASE}{path}", headers=_headers(), timeout=15, **kw)
+    except Exception as exc:  # noqa: BLE001
+        st.sidebar.error(f"无法连接 API：{exc}")
+        return None
+    if resp.status_code >= 400:
+        st.sidebar.error(f"操作失败 {resp.status_code}：{resp.text[:200]}")
+        return None
+    return resp
+
+
+def render_memory_panel() -> None:
+    """侧边栏「记忆」面板：查看 / 添加 / 删除长期记忆（memory_design.md#6）。"""
+    resp = _api("GET", "/api/v1/memory")
+    if resp is None:
+        return
+    body = resp.json()
+    if not body.get("enabled", True):
+        st.caption("⚠️ 服务端已关闭长期记忆（memory.long_term_enabled=false）")
+
+    items = body.get("items", [])
+    st.caption(f"共 {len(items)} 条")
+    if not items:
+        st.caption("暂无记忆。对话中提到身份、偏好等信息后会自动沉淀。")
+
+    for item in items:
+        left, right = st.columns([0.84, 0.16])
+        with left:
+            kind = _KIND_LABEL.get(item["kind"], item["kind"])
+            pin = "📌 " if item.get("pinned") else ""
+            st.markdown(f"{pin}[{kind}] {item['content']}")
+            updated = str(item.get("updated_at") or "")[:16].replace("T", " ")
+            st.caption(f"命中 {item.get('hit_count', 0)} 次 · {updated}")
+        with right:
+            if st.button("🗑", key=f"mem_del_{item['id']}", help="删除这条记忆"):
+                if _api("DELETE", f"/api/v1/memory/{item['id']}") is not None:
+                    st.toast("已删除该条记忆")
+                    st.rerun()
+
+    with st.form("memory_add", clear_on_submit=True):
+        st.text_input("新记忆内容", key="mem_new_content", max_chars=500)
+        st.selectbox("类别", _MEMORY_KINDS, key="mem_new_kind")
+        st.checkbox("置顶（永不被淘汰）", key="mem_new_pinned")
+        if st.form_submit_button("添加记忆"):
+            content = (st.session_state.get("mem_new_content") or "").strip()
+            if not content:
+                st.warning("内容不能为空")
+            elif (
+                _api(
+                    "POST",
+                    "/api/v1/memory",
+                    json={
+                        "content": content,
+                        "kind": st.session_state.get("mem_new_kind", "fact"),
+                        "pinned": bool(st.session_state.get("mem_new_pinned")),
+                    },
+                )
+                is not None
+            ):
+                st.toast("已添加记忆")
+                st.rerun()
+
+    if st.checkbox("确认清空全部记忆", key="mem_clear_confirm"):
+        if st.button("🚨 清空", type="primary"):
+            cleared = _api("DELETE", "/api/v1/memory")
+            if cleared is not None:
+                st.toast(f"已清空 {cleared.json().get('cleared', 0)} 条")
+                st.session_state.pop("mem_clear_confirm", None)
+                st.rerun()
+
+
 # ---------------- 侧边栏 ----------------
 with st.sidebar:
     st.title("SmartQA")
@@ -125,6 +207,11 @@ with st.sidebar:
         st.divider()
         st.session_state["use_rag"] = st.checkbox("启用 RAG", value=True)
         st.session_state["use_agent"] = st.checkbox("启用 Agent（工具调用）", value=False)
+
+        st.divider()
+        # 默认折叠：仅在打开时才请求 API，避免每次 rerun 都拉取
+        if st.toggle("🧠 长期记忆", value=False, key="show_memory"):
+            render_memory_panel()
 
 # ---------------- 主区 ----------------
 st.header("SmartQA 智能问答")

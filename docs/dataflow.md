@@ -13,6 +13,7 @@ sequenceDiagram
     participant S as ChatService
     participant G as Guardrails
     participant M as Memory
+    participant LT as LongTermMemory
     participant AG as QAAgent
     participant R as HybridRetriever
     participant V as VectorStore
@@ -26,6 +27,8 @@ sequenceDiagram
     S->>G: input_filter.check
     S->>M: load(session_id)
     M-->>S: history
+    S->>LT: recall(user_id, question)
+    LT-->>S: memories → system 消息
     S->>AG: run(question, history)
     AG->>R: retrieve(question)
     R->>V: vector_search(qv, k=20)
@@ -38,6 +41,7 @@ sequenceDiagram
     S->>G: output_filter.check
     S->>M: save(session, q, a)
     S->>DB: persist_message
+    S-->>LT: consolidate(q, a)  异步沉淀，不阻塞 SSE
     S-->>A: SSE events
     A-->>W: text/event-stream
     W-->>U: 渲染答案 + 引用
@@ -50,6 +54,7 @@ sequenceDiagram
 | 检索 | `list[Chunk]{ id, content, score, meta }` |
 | Prompt | `[{role:system, content}, {role:user, content:q}, {role:user, content:ctx}]` |
 | 流式事件 | `event: token` / `event: citation` / `event: done` |
+| 长期记忆 | 召回 `[{kind,content}]` → 渲染为 system 消息注入 `messages` 首部 |
 | 持久化 | `messages{ role, content, citations(json), tokens, latency }` |
 
 ## 3. 失败路径

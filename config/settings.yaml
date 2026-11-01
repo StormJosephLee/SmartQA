@@ -28,6 +28,21 @@ agent:
 memory:
   max_turns: 10
   max_chars: 4000
+  # ---- 长期记忆（详见 docs/memory_design.md）----
+  # 总开关：关闭后既不沉淀也不注入
+  long_term_enabled: true
+  # 是否用 LLM 从对话抽取记忆；关闭后只能通过 API 手动写入
+  extract_enabled: true
+  # 单次注入上下文的条数上限
+  inject_top_k: 5
+  # pgvector 候选召回数，需 >= inject_top_k
+  recall_top_k: 20
+  # 单用户记忆总量上限，超出按「最久未命中且未置顶」淘汰
+  max_items_per_user: 200
+  # 余弦距离阈值（pgvector <=> 越小越相似），低于它视为重复，更新而非新增
+  dedupe_distance: 0.12
+  # 允许写入的类别白名单
+  allowed_kinds: [profile, preference, fact, instruction]
 
 security:
   max_input_chars: 4000

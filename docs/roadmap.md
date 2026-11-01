@@ -27,3 +27,6 @@
   - 理由：与 `onboarding.md`、`architecture.md` 的模块心智一致
   - 影响：`security.md` 中历史遗留的 `app/core`、`app/guardrails`、`app/observability` 路径已统一为顶层包
   - 新增包说明：`core/`（横切能力）、`llm/`（模型适配层）、`schemas/`（DTO）、`ui/`（前端）
+- **ADR-005**：长期记忆选「Postgres + pgvector」存储，沉淀走异步 LLM 抽取
+  - 理由：记忆要跨会话永久留存且需语义召回，复用 RAG 已有的 pgvector 与 embedding 模型可避免引入新组件；同步抽取会把 1~3s 的 LLM 耗时叠加在每次问答的延迟上，故放入后台任务执行
+  - 影响：新增 `long_term_memories` 表与 `memory/long_term.py`；`ChatService` 增加 `_with_memories`（读取注入）与 `_schedule_consolidate`（异步沉淀）；新增 `/api/v1/memory` 一组接口供用户查看与删除自己的记忆（详见 [memory_design.md](./memory_design.md)）
