@@ -40,6 +40,27 @@ def save_upload(file: UploadFile) -> Path:
     return target
 
 
+def to_source_uri(path: Path) -> str:
+    """把存储路径转成相对项目根的路径后入库。
+
+    好处：项目移动 / 换机器部署后仍然有效，也不会通过 API 向前端暴露目录结构。
+    路径不在项目根下时（如自定义存储目录）保留原样，保证功能不受影响。
+    """
+    try:
+        return str(path.resolve().relative_to(ROOT_DIR.resolve()))
+    except ValueError:
+        return str(path)
+
+
+def resolve_source_uri(uri: str) -> Path:
+    """把库里的 source_uri 还原为绝对路径；相对路径基于项目根目录解析。
+
+    兼容两种存量格式：旧数据为绝对路径（原样使用），新数据为相对路径。
+    """
+    path = Path(uri)
+    return path if path.is_absolute() else ROOT_DIR / path
+
+
 def create_document(session: Session, kb_id: str, title: str, source_uri: str) -> Document:
     doc = Document(kb_id=kb_id, title=title, source_uri=source_uri, status="pending")
     session.add(doc)
@@ -78,7 +99,7 @@ def delete_document(session: Session, doc_id: str) -> str:
 
     get_bm25_store().invalidate()
     if doc.source_uri:
-        Path(doc.source_uri).unlink(missing_ok=True)
+        resolve_source_uri(doc.source_uri).unlink(missing_ok=True)
     return doc_id
 
 

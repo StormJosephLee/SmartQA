@@ -1,5 +1,5 @@
 from rag.bm25 import tokenize
-from rag.retriever import rrf_fuse
+from rag.retriever import RetrievedChunk, rrf_fuse
 from rag.splitter import split_text
 
 
@@ -26,3 +26,25 @@ def test_rrf_fuse_prefers_overlap():
 def test_tokenize_mixed_language():
     tokens = tokenize("年假 Annual Leave 5天")
     assert "年" in tokens and "annual" in tokens
+
+
+def test_source_prefers_title_over_storage_uri():
+    """引用来源应显示可读标题，而非 uuid 重命名后的存储路径。"""
+    chunk = RetrievedChunk(
+        id="1",
+        content="x",
+        meta={"title": "员工手册.pdf", "source_uri": "storage/uploads/9f8e7d6c.pdf"},
+    )
+    assert chunk.source == "员工手册.pdf"
+
+
+def test_source_falls_back_to_uri_basename():
+    """无标题时只取存储路径的文件名，不暴露服务器目录结构。"""
+    chunk = RetrievedChunk(id="1", content="x", meta={"source_uri": "/srv/uploads/9f8e7d6c.pdf"})
+    assert chunk.source == "9f8e7d6c.pdf"
+
+
+def test_source_empty_meta_returns_empty():
+    assert RetrievedChunk(id="1", content="x", meta={}).source == ""
+    blank = RetrievedChunk(id="1", content="x", meta={"title": "", "source_uri": ""})
+    assert blank.source == ""

@@ -31,7 +31,9 @@ flowchart LR
 | 表格 | 整表保留 | - | - |
 | 代码 | 按函数/类 | 1024 | 64 |
 
-每个 chunk 携带元数据：`source_uri, page, kb_id, doc_id, chunk_index`
+每个 chunk 携带元数据：`title, source_uri, page, kb_id, doc_id, chunk_index`。
+引用展示以 `title`（上传时的原始文件名）优先（见 `RetrievedChunk.source`）。
+`source_uri` 存的是**相对项目根的路径**（`kb_service.to_source_uri`），便于项目迁移且不向前端暴露服务器目录结构；使用时经 `resolve_source_uri` 还原为绝对路径，同时兼容旧的绝对路径存量数据。
 
 ## 4. 检索策略
 - 向量召回：`top_k=20`，余弦相似

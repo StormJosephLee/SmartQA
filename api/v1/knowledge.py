@@ -14,6 +14,7 @@ from services.kb_service import (
     list_documents,
     run_ingestion,
     save_upload,
+    to_source_uri,
 )
 
 router = APIRouter(prefix="/knowledge", tags=["knowledge"])
@@ -35,7 +36,7 @@ async def upload(
 
     saved_path = save_upload(file)
     doc = create_document(
-        session, kb_id=kb_id, title=file.filename or saved_path.name, source_uri=str(saved_path)
+        session, kb_id=kb_id, title=file.filename or saved_path.name, source_uri=to_source_uri(saved_path)
     )
     background_tasks.add_task(run_ingestion, doc.id, saved_path)
     return KBDocument(

@@ -10,6 +10,7 @@ sys.path.insert(0, str(ROOT))
 
 from core.logging import setup_logging  # noqa: E402
 from db.models import Document  # noqa: E402
+from services.kb_service import to_source_uri  # noqa: E402
 from db.session import SessionLocal  # noqa: E402
 from rag.pipeline import ingest_document  # noqa: E402
 
@@ -28,7 +29,9 @@ async def main() -> int:
     ok = 0
     with SessionLocal() as session:
         for path in files:
-            doc = Document(kb_id=DEFAULT_KB_ID, title=path.name, source_uri=str(path), status="pending")
+            doc = Document(
+                kb_id=DEFAULT_KB_ID, title=path.name, source_uri=to_source_uri(path), status="pending"
+            )
             session.add(doc)
             session.commit()
             try:

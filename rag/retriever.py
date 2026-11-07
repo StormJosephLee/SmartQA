@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 from dataclasses import dataclass, field
+from pathlib import Path
 
 from sqlalchemy.orm import Session
 
@@ -25,7 +26,16 @@ class RetrievedChunk:
 
     @property
     def source(self) -> str:
-        return self.meta.get("source_uri") or self.meta.get("title") or ""
+        """人类可读的引用来源：优先文档标题；缺失时退化为存储路径的文件名。
+
+        source_uri 是服务端 uuid 重命名后的存储路径（kb_service.save_upload），
+        对用户毫无意义且会暴露服务器目录结构，故只取其文件名作兜底。
+        """
+        title = str(self.meta.get("title") or "").strip()
+        if title:
+            return title
+        uri = str(self.meta.get("source_uri") or "").strip()
+        return Path(uri).name if uri else ""
 
     @property
     def page(self) -> int:
